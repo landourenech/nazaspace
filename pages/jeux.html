@@ -16,6 +16,20 @@
   <body>
     <div id="app"></div>
     <h1></h1>
+    <div id="game-ui">
+      <div id="score" style="font-size: 24px; color: white; position: absolute; top: 10px; left: 10px;">
+        Score: 0
+      </div>
+      <div id="game-over" style="font-size: 48px; color: red; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none;">
+        Game Over
+      </div>
+    </div>
+    
     <script type="module" src="../threejs/jeux.js"></script>
+  <button id="restart-button" style="display: none; position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); padding: 10px 20px; font-size: 24px;">
+  Restart
+</button>
+
+  
   </body>
 </html>
