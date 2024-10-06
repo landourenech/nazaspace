@@ -1,21 +1,349 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Similator</title>
-    <style>
-      body {
-        margin: 0;
-        background: rgb(rgb(168, 29, 29), rgb(216, 125, 7), rgb(255, 0, 0))
-      }
-    </style>
-    
+<html><head><base href="https://websimai.com/"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Tennis 3D Amélioré</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+  <style>
+  body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: rgba(red, rgb(128, 126, 0), rgb(255, 145, 0));
+  }
+  #gameCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+  }
+  #score {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: white;
+      font-family: 'Arial', sans-serif;
+      font-size: 28px;
+      background-color: rgba(0,0,0,0.6);
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  }
+  #instructions {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      font-family: 'Arial', sans-serif;
+      font-size: 18px;
+      background-color: rgba(0,0,0,0.6);
+      padding: 10px 20px;
+      border-radius: 20px;
+      text-align: center;
+  }
+  </style>
   </head>
   <body>
-    <div id="app"></div>
-    <h1>Similator</h1>
-    <script type="module" src="../threejs/similator.js"></script>
-  </body>
-</html>
+  <div id="score">Joueur: 0 - AI: 0</div>
+  <div id="instructions">Déplacez votre souris pour contrôler le joueur</div>
+  <canvas id="gameCanvas"></canvas>
+  
+  <script>
+  let scene, camera, renderer, court, ball, playerCharacter, aiCharacter;
+  let playerScore = 0, aiScore = 0;
+  let ballSpeed = 0.2; 
+  let ballDirectionX = 1;
+  let ballDirectionZ = 1;
+  
+  function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      renderer = new THREE.WebGLRenderer({canvas: document.getElementById('gameCanvas'), antialias: true});
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x87CEEB);
+  
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(5, 10, 7);
+      scene.add(directionalLight);
+  
+      createLandscape();
+      createCourt();
+      createBall();
+      createCharacters();
+  
+      camera.position.set(0, 10, 30);
+      camera.lookAt(court.position);
+  
+      animate();
+  }
+  
+  function createLandscape() {
+      const groundGeometry = new THREE.PlaneGeometry(200, 200);
+      const groundMaterial = new THREE.MeshPhongMaterial({color: 0x358a2f});
+      const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -0.1;
+      scene.add(ground);
+  
+      for (let i = 0; i < 50; i++) {
+          const tree = createTree();
+          tree.position.set(
+              Math.random() * 180 - 90,
+              0,
+              Math.random() * 180 - 90
+          );
+          if (Math.abs(tree.position.x) > 15 || Math.abs(tree.position.z) > 20) {
+              scene.add(tree);
+          }
+      }
+  
+      const mountainGeometry = new THREE.ConeGeometry(20, 60, 4);
+      const mountainMaterial = new THREE.MeshPhongMaterial({color: 0x4d4d4d});
+      for (let i = 0; i < 10; i++) {
+          const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
+          mountain.position.set(
+              Math.random() * 300 - 150,
+              20,
+              -100 - Math.random() * 50
+          );
+          mountain.scale.set(Math.random() + 0.5, Math.random() + 0.5, Math.random() + 0.5);
+          scene.add(mountain);
+      }
+  
+      const skyGeometry = new THREE.SphereGeometry(500, 32, 32);
+      const skyMaterial = new THREE.MeshBasicMaterial({color: 0x87CEEB, side: THREE.BackSide});
+      const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+      scene.add(sky);
+  }
+  
+  function createTree() {
+      const tree = new THREE.Group();
+      
+      const trunkGeometry = new THREE.CylinderGeometry(0.4, 0.4, 4, 8);
+      const trunkMaterial = new THREE.MeshPhongMaterial({color: 0x8B4513});
+      const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+      trunk.position.y = 2;
+      tree.add(trunk);
+  
+      const leavesGeometry = new THREE.SphereGeometry(3, 8, 8);
+      const leavesMaterial = new THREE.MeshPhongMaterial({color: 0x228B22});
+      const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+      leaves.position.y = 5;
+      tree.add(leaves);
+  
+      return tree;
+  }
+  
+  function createCourt() {
+      const courtGeometry = new THREE.BoxGeometry(24, 0.1, 56);
+      const courtMaterial = new THREE.MeshPhongMaterial({color: 0x1b8d3b});
+      court = new THREE.Mesh(courtGeometry, courtMaterial);
+      scene.add(court);
+  
+      createCourtLines();
+      createNet();
+  }
+  
+  function createCourtLines() {
+      const lineMaterial = new THREE.MeshBasicMaterial({color: 0xffffff});
+      
+      const sideLineGeometry = new THREE.BoxGeometry(0.1, 0.11, 56);
+      const leftSideLine = new THREE.Mesh(sideLineGeometry, lineMaterial);
+      leftSideLine.position.x = -12;
+      leftSideLine.position.y = 0.06;
+      scene.add(leftSideLine);
+  
+      const rightSideLine = new THREE.Mesh(sideLineGeometry, lineMaterial);
+      rightSideLine.position.x = 12;
+      rightSideLine.position.y = 0.06;
+      scene.add(rightSideLine);
+  
+      const endLineGeometry = new THREE.BoxGeometry(24, 0.11, 0.1);
+      const topEndLine = new THREE.Mesh(endLineGeometry, lineMaterial);
+      topEndLine.position.z = 28;
+      topEndLine.position.y = 0.06;
+      scene.add(topEndLine);
+  
+      const bottomEndLine = new THREE.Mesh(endLineGeometry, lineMaterial);
+      bottomEndLine.position.z = -28;
+      bottomEndLine.position.y = 0.06;
+      scene.add(bottomEndLine);
+  }
+  
+  function createNet() {
+      const netPoleGeometry = new THREE.CylinderGeometry(0.2, 0.2, 3, 8);
+      const netPoleMaterial = new THREE.MeshPhongMaterial({color: 0x808080});
+      
+      const leftPole = new THREE.Mesh(netPoleGeometry, netPoleMaterial);
+      leftPole.position.set(-12, 1.5, 0);
+      scene.add(leftPole);
+  
+      const rightPole = new THREE.Mesh(netPoleGeometry, netPoleMaterial);
+      rightPole.position.set(12, 1.5, 0);
+      scene.add(rightPole);
+  
+      const netGeometry = new THREE.PlaneGeometry(24, 2);
+      const netMaterial = new THREE.MeshPhongMaterial({
+          color: 0xffffff,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.7
+      });
+      const net = new THREE.Mesh(netGeometry, netMaterial);
+      net.position.y = 1.5;
+      net.rotation.y = Math.PI / 2;
+      scene.add(net);
+  }
+  
+  function createBall() {
+      const ballGeometry = new THREE.SphereGeometry(0.2, 32, 32);
+      const ballMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
+      ball = new THREE.Mesh(ballGeometry, ballMaterial);
+      ball.position.y = 2;
+      scene.add(ball);
+  }
+  
+  function createCharacters() {
+      playerCharacter = createCharacter(0xff0000);
+      playerCharacter.position.z = 24;
+      scene.add(playerCharacter);
+  
+      aiCharacter = createCharacter(0x0000ff);
+      aiCharacter.position.z = -24;
+      scene.add(aiCharacter);
+  }
+  
+  function createCharacter(color) {
+      const character = new THREE.Group();
+  
+      const bodyGeometry = new THREE.BoxGeometry(1.2, 2, 0.8);
+      const bodyMaterial = new THREE.MeshPhongMaterial({color: color});
+      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+      body.position.y = 2.2;
+      character.add(body);
+  
+      const headGeometry = new THREE.SphereGeometry(0.5, 32, 32);
+      const headMaterial = new THREE.MeshPhongMaterial({color: 0xffdab9});
+      const head = new THREE.Mesh(headGeometry, headMaterial);
+      head.position.y = 3.7;
+      character.add(head);
+  
+      const legGeometry = new THREE.BoxGeometry(0.5, 1.2, 0.5);
+      const legMaterial = new THREE.MeshPhongMaterial({color: 0x000000});
+      const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+      leftLeg.position.set(-0.4, 0.6, 0);
+      character.add(leftLeg);
+  
+      const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+      rightLeg.position.set(0.4, 0.6, 0);
+      character.add(rightLeg);
+  
+      const armGeometry = new THREE.BoxGeometry(0.5, 1.4, 0.5);
+      const leftArm = new THREE.Mesh(armGeometry, bodyMaterial);
+      leftArm.position.set(-0.85, 2.2, 0);
+      character.add(leftArm);
+  
+      const rightArm = new THREE.Mesh(armGeometry, bodyMaterial);
+      rightArm.position.set(0.85, 2.2, 0);
+      character.add(rightArm);
+  
+      const racketHandle = new THREE.Mesh(
+          new THREE.BoxGeometry(0.1, 1, 0.1),
+          new THREE.MeshPhongMaterial({color: 0x8B4513})
+      );
+      const racketHead = new THREE.Mesh(
+          new THREE.BoxGeometry(0.8, 1, 0.1),
+          new THREE.MeshPhongMaterial({color: 0xC0C0C0})
+      );
+      racketHead.position.y = 0.8;
+      const racket = new THREE.Group();
+      racket.add(racketHandle);
+      racket.add(racketHead);
+      racket.position.set(1.4, 2.2, 0);
+      character.add(racket);
+  
+      return character;
+  }
+  
+  function animate() {
+      requestAnimationFrame(animate);
+  
+      ball.position.x += ballSpeed * ballDirectionX;
+      ball.position.z += ballSpeed * ballDirectionZ;
+  
+      if (ball.position.x > 11.9 || ball.position.x < -11.9) {
+          ballDirectionX *= -1;
+      }
+  
+      if (ball.position.z > 28) {
+          aiScore++;
+          resetBall();
+      } else if (ball.position.z < -28) {
+          playerScore++;
+          resetBall();
+      }
+  
+      checkPlayerCollision(playerCharacter, 24);
+      checkPlayerCollision(aiCharacter, -24);
+  
+      moveAI();
+  
+      updateScore();
+  
+      renderer.render(scene, camera);
+  }
+  
+  function checkPlayerCollision(player, zPosition) {
+      if (Math.abs(ball.position.z - zPosition) < 1 && 
+          Math.abs(ball.position.x - player.position.x) < 2.4) {
+          ballDirectionZ *= -1;
+          ballSpeed = Math.min(ballSpeed + 0.005, 0.4);
+          swingRacket(player);
+      }
+  }
+  
+  function swingRacket(player) {
+      const racket = player.children[player.children.length - 1];
+      gsap.to(racket.rotation, {
+          y: Math.PI / 2,
+          duration: 0.1,
+          yoyo: true,
+          repeat: 1
+      });
+  }
+  
+  function moveAI() {
+      const targetX = ball.position.x;
+      aiCharacter.position.x = THREE.MathUtils.lerp(aiCharacter.position.x, targetX, 0.03);
+      aiCharacter.position.x = THREE.MathUtils.clamp(aiCharacter.position.x, -10, 10);
+  }
+  
+  function resetBall() {
+      ball.position.set(0, 2, 0);
+      ballSpeed = 0.2;
+      ballDirectionX = Math.random() > 0.5 ? 1 : -1;
+      ballDirectionZ = Math.random() > 0.5 ? 1 : -1;
+  }
+  
+  function updateScore() {
+      document.getElementById('score').innerText = `Joueur: ${playerScore} - AI: ${aiScore}`;
+  }
+  
+  function onMouseMove(event) {
+      const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+      playerCharacter.position.x = mouseX * 12;
+      playerCharacter.position.x = THREE.MathUtils.clamp(playerCharacter.position.x, -10, 10);
+  }
+  
+  window.addEventListener('mousemove', onMouseMove);
+  
+  window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  
+  init();
+  </script>
+  </body></html>
